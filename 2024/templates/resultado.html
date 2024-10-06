@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Previsão de Votos</title>
+    <!-- Link para o arquivo CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Previsão Geral de Votos por Partido</h1>
+        <table>
+            <tr>
+                <th>Partido</th>
+                <th>Porcentagem de Votos Prevista</th>
+            </tr>
+            {% for partido, porcentagem in zip(partidos, porcentagem_votos_previstos) %}
+            <tr>
+                <td>{{ partido }}</td>
+                <td>{{ porcentagem }}%</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <h2>Partido Vencedor</h2>
+        <p>O partido vencedor seria: <strong>{{ partido_vencedor }}</strong></p>
+
+        <h2>Tendências por Grupos Específicos</h2>
+        <ul>
+            {% for tendencia in tendencias %}
+            <li>{{ tendencia }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

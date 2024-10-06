@@ -11,13 +11,7 @@ def normalize_predictions(predictions):
 def normalize_row(row):
     return row / row.sum()
 
-# Função para sortear votos de forma aleatória, respeitando a distribuição
-def sortear_votos_aleatorios(votos_df, porcentagem):
-    """Sorteia uma porcentagem dos votos de forma aleatória."""
-    votos_sorteados = votos_df.apply(lambda x: np.random.binomial(x, porcentagem))
-    return votos_sorteados
-
-# Carregar as tabelas
+# Carregar as tabelas de votos (dados incompletos) e eleitores
 tabela_votos = pd.read_csv("2024/2020_votos.csv")
 tabela_eleitores = pd.read_csv("2024/2020_eleitores_filiados.csv", delimiter=';')
 
@@ -28,16 +22,20 @@ tabela_eleitores.rename(columns={
     'Faixa et�ria': 'Idade'
 }, inplace=True)
 
+# Extrair o nome dos partidos e a coluna 'Zona' dinamicamente da tabela de votos
+colunas_votos = tabela_votos.columns
+partidos = colunas_votos.drop('Zona')  # Exclui a coluna 'Zona', deixando apenas os partidos
+
 # Unir as duas tabelas usando a coluna 'Zona' como identificador
 df = pd.merge(tabela_eleitores, tabela_votos, on='Zona', how='inner')
 
-# Inputs: Apenas sexo, escolaridade, idade, partido (ignorando 'local_votacao' e 'zona' para treino)
+# Inputs: Apenas sexo, escolaridade, idade, partido
 X_full = df[['Zona', 'Genero', 'Escolaridade', 'Idade', 'Partido']]
 
-# Outputs: Distribuição de votos nos partidos
-y_full = df[['Zona', 'psol', 'pp', 'rep', 'pdt', 'pstu', 'pco', 'pcdob', 'pv', 'psdb', 'pros', 'mdb', 'psd']]
+# Outputs: Distribuição de votos nos partidos (com base nos dados reais apurados)
+y_full = df[['Zona'] + list(partidos)]
 
-# Aplicar a normalização no y_full por zona
+# Normalizar os dados de votos apurados por zona
 y_full_normalized = y_full.groupby('Zona').apply(lambda x: normalize_row(x.drop(columns='Zona').sum())).reset_index()
 
 # Agrupar os eleitores por zona para corresponder ao número de zonas
@@ -46,43 +44,47 @@ X_full_grouped = X_full.groupby('Zona').first().reset_index()  # Agrupa por zona
 # Transformar as variáveis categóricas em variáveis numéricas usando one-hot encoding
 X_full_dummies = pd.get_dummies(X_full_grouped.drop(columns='Zona'), drop_first=True)
 
-# Simular a apuração parcial sorteando uma porcentagem aleatória dos votos
-porcentagem_apurada = 0.10  # Exemplo: 25% dos votos apurados
-y_apurado = sortear_votos_aleatorios(tabela_votos[['psol', 'pp', 'rep', 'pdt', 'pstu', 'pco', 'pcdob', 'pv', 'psdb', 'pros', 'mdb', 'psd']], porcentagem_apurada)
+# Filtrar as zonas com votos apurados (incompletos)
+zonas_apuradas = y_full_normalized.index[y_full_normalized.drop(columns='Zona').sum(axis=1) > 0]
 
-# Zonas com votos sorteados
-zonas_apuradas = y_apurado.index[y_apurado.sum(axis=1) > 0]  # Pegamos as zonas que realmente tiveram votos sorteados
-
-# Filtrar as zonas apuradas em X e y
+# Filtrar os dados das zonas apuradas em X e y
 X_train = X_full_dummies.loc[zonas_apuradas]
-y_train = y_apurado.loc[zonas_apuradas]
+y_train = y_full_normalized.loc[zonas_apuradas].drop(columns='Zona')
 
-# Verificar a correspondência entre X_train e y_train
-print(f"Tamanho de X_train (zonas apuradas): {len(X_train)}")
-print(f"Tamanho de y_train (zonas apuradas): {len(y_train)}")
-
-# Normalizar a distribuição dos votos sorteados (apurados) por zona
-y_train_normalizado = y_train.apply(normalize_row, axis=1)
-
-# Criar o modelo baseado apenas nas zonas parcialmente apuradas
+# Treinar o modelo de regressão linear com base nos dados disponíveis
 model = LinearRegression()
-model.fit(X_train, y_train_normalizado)
+model.fit(X_train, y_train)
 
-# Prever a distribuição de votos para toda a cidade (incluindo zonas não apuradas)
+# Prever a distribuição de votos para todas as zonas, incluindo aquelas que não têm todos os votos apurados
 y_pred = model.predict(X_full_dummies)  # Previsão para toda a cidade
 
 # Normalizar as previsões
 y_pred_normalized = normalize_predictions(y_pred)
 
-# Calcular o erro comparando com a tabela completa original (tabela de 2020)
-mse_total = mean_squared_error(y_full_normalized.drop(columns='Zona') * 100, y_pred_normalized * 100)
+# Calcular a porcentagem de votos previstos por partido para toda a cidade
+porcentagem_votos_previstos = (y_pred_normalized.mean(axis=0) * 100).round(2)
 
-# Exibir os resultados
-print(f"Erro Quadrático Médio para a cidade toda com {porcentagem_apurada * 100}% de apuração: {mse_total:.5f}")
+# Exibir a previsão geral de porcentagem de votos por partido
+print("\nPrevisão geral de porcentagem de votos por partido:")
+for partido, porcentagem in zip(partidos, porcentagem_votos_previstos):
+    print(f"{partido}: {porcentagem}%")
 
-# Exibir algumas das previsões e resultados reais para verificação
-print("\nPrevisões (normalizadas) para as primeiras 5 zonas:")
-print(pd.DataFrame(y_pred_normalized, columns=['psol', 'pp', 'rep', 'pdt', 'pstu', 'pco', 'pcdob', 'pv', 'psdb', 'pros', 'mdb', 'psd']).head())
+# Determinar o partido vencedor
+partido_vencedor = partidos[np.argmax(porcentagem_votos_previstos)]
+print(f"\nO partido vencedor seria: {partido_vencedor}")
 
-print("\nResultados reais (normalizados) para as primeiras 5 zonas:")
-print(y_full_normalized.head())
+# Analisar a tendência de grupos específicos (homens, mulheres, jovens, etc.)
+coeficientes = pd.DataFrame(model.coef_, columns=X_full_dummies.columns)
+
+# Tendências em relação à média
+print("\nTendência de cada grupo em relação à votação nos partidos:")
+for grupo in X_full_dummies.columns:
+    tendencia_partido = coeficientes.loc[:, grupo].idxmax()  # Partido mais favorecido por este grupo
+    coef_maior = coeficientes.loc[:, grupo].max()  # Coeficiente máximo para o partido mais favorecido
+    coef_menor = coeficientes.loc[:, grupo].min()  # Coeficiente mínimo (partido menos favorecido)
+    
+    if coef_maior > 0:
+        print(f"Ser {grupo} aumenta as chances de votar principalmente no partido {partidos[tendencia_partido]} em {(coef_maior* 100).round(2)}%.")
+    if coef_menor < 0:
+        partido_menos_fav = coeficientes.loc[:, grupo].idxmin()
+        print(f"Ser {grupo} diminui as chances de votar no partido {partidos[partido_menos_fav]} em {(coef_menor* 100).round(2)}%.")
