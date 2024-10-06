@@ -1,5 +1,5 @@
 
-# Previsão de Votos - Projeto Flask com Machine Learning
+# Previsão de Votos - Projeto Flask com Estatística
 
 Este projeto utiliza **Flask** para servir um modelo de **regressão linear** que faz previsões sobre a distribuição de votos em diferentes partidos políticos, com base em dados reais e incompletos de apurações eleitorais. O site exibe previsões de porcentagem de votos por partido, o partido vencedor projetado, e uma análise das tendências de voto entre grupos específicos (gênero, escolaridade, idade, etc.).
 
