@@ -1,7 +1,8 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, redirect, url_for
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
+import subprocess
 
 app = Flask(__name__)
 
@@ -81,14 +82,21 @@ def previsao_votos():
         coef_menor = coeficientes.loc[:, grupo].min()  # Coeficiente mínimo (partido menos favorecido)
         
         if coef_maior > 0:
-            tendencias.append(f"Ser {grupo} aumenta as chances de votar principalmente no partido {tendencia_partido} em {(coef_maior* 100).round(2)}%.")
+            tendencias.append(f"Ser {grupo} aumenta as chances de votar principalmente no partido {partidos[tendencia_partido]} em {(coef_maior* 100).round(2)}%.")
         if coef_menor < 0:
             partido_menos_fav = coeficientes.loc[:, grupo].idxmin()
-            tendencias.append(f"Ser {grupo} diminui as chances de votar no partido {partido_menos_fav} em {(coef_menor* 100).round(2)}%.")
+            tendencias.append(f"Ser {grupo} diminui as chances de votar no partido {partidos[partido_menos_fav]} em {(coef_menor* 100).round(2)}%.")
 
     # Renderizar o template com as previsões e tendências
     return render_template('resultado.html', partidos=partidos, porcentagem_votos_previstos=porcentagem_votos_previstos,
                            partido_vencedor=partido_vencedor, tendencias=tendencias, zip=zip)
+
+@app.route('/recarregar')
+def recarregar_dados():
+    # Executar o script scrappler.py para atualizar os dados
+    subprocess.run(["python", "2024/scrappler.py"], check=True)
+    # Após a execução do script, redirecionar de volta à página principal
+    return redirect(url_for('previsao_votos'))
 
 if __name__ == '__main__':
     app.run(debug=True)

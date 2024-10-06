@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Previsão de Votos</title>
-    <!-- Link para o arquivo CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='/style.css') }}">
 </head>
 <body>
@@ -32,6 +31,11 @@
             <li>{{ tendencia }}</li>
             {% endfor %}
         </ul>
+
+        <!-- Botão para recarregar -->
+        <form action="{{ url_for('recarregar_dados') }}" method="get">
+            <button type="submit">Recarregar Dados</button>
+        </form>
     </div>
 </body>
 </html>
